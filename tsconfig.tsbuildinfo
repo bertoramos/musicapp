@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/components/chordplayer.tsx","./src/db/database.ts","./src/lib/audio.ts","./src/lib/chords.ts","./src/pages/songeditor.tsx","./src/pages/songlist.tsx"],"version":"5.9.3"}

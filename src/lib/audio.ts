@@ -2,6 +2,32 @@ import * as Tone from 'tone';
 import { chordNotes, parseChord } from './chords';
 
 let synth: Tone.PolySynth | null = null;
+let unlocked = false;
+
+// Desbloquea el AudioContext al primer toque del usuario.
+// En móvil (especialmente iOS/Android) Tone.js exige iniciarlo dentro de un gesto.
+export function unlockAudioOnFirstGesture() {
+  const handler = async () => {
+    if (unlocked) return;
+    try {
+      await Tone.start();
+      // Ping silencioso para forzar al contexto a estado "running".
+      const ctx = Tone.getContext().rawContext;
+      if (ctx.state !== 'running') {
+        await (ctx as AudioContext).resume();
+      }
+      unlocked = true;
+      window.removeEventListener('touchstart', handler);
+      window.removeEventListener('mousedown', handler);
+      window.removeEventListener('keydown', handler);
+    } catch (e) {
+      console.warn('Audio unlock failed', e);
+    }
+  };
+  window.addEventListener('touchstart', handler, { passive: true });
+  window.addEventListener('mousedown', handler);
+  window.addEventListener('keydown', handler);
+}
 
 function getSynth() {
   if (!synth) {
