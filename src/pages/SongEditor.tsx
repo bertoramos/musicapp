@@ -1,11 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 import { db } from '../db/database';
 import type { Song } from '../types';
 import { parseProgression } from '../lib/chords';
 import { playProgression } from '../lib/audio';
-import { ChordPlayer } from '../components/ChordPlayer';
 import { ChordPalette } from '../components/ChordPalette';
+import { Progression } from '../components/Progression';
 import type { Mode, Root } from '../lib/keys';
 
 export function SongEditor() {
@@ -25,18 +34,56 @@ export function SongEditor() {
     db.songs.put(updated);
   }
 
-  function appendChord(chord: string) {
-    if (!song) return;
-    const sep = song.chords.trim().length === 0 ? '' : ' | ';
-    update('chords', song.chords + sep + chord);
+  // Cada item de la progresión necesita un id estable para dnd-kit aunque haya acordes repetidos.
+  const idCounter = useRef(0);
+  const items = useMemo(() => {
+    return parseProgression(song?.chords ?? '').map((chord) => ({
+      id: `c-${idCounter.current++}`,
+      chord,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [song?.chords]);
+
+  function saveItems(next: { id: string; chord: string }[]) {
+    update('chords', next.map((i) => i.chord).join(' | '));
   }
 
-  function removeLastChord() {
+  function appendChord(chord: string) {
     if (!song) return;
-    const list = parseProgression(song.chords);
-    list.pop();
-    update('chords', list.join(' | '));
+    saveItems([...items, { id: `c-${idCounter.current++}`, chord }]);
   }
+
+  function removeItem(id: string) {
+    saveItems(items.filter((i) => i.id !== id));
+  }
+
+  function handleDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over) return;
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    // Drag desde la paleta -> añadir al final
+    if (activeId.startsWith('palette-')) {
+      const chord = active.data.current?.chord as string | undefined;
+      if (chord) appendChord(chord);
+      return;
+    }
+
+    // Reordenar dentro de la progresión
+    if (activeId !== overId) {
+      const oldIndex = items.findIndex((i) => i.id === activeId);
+      const newIndex = items.findIndex((i) => i.id === overId);
+      if (oldIndex >= 0 && newIndex >= 0) {
+        saveItems(arrayMove(items, oldIndex, newIndex));
+      }
+    }
+  }
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+  );
 
   async function remove() {
     if (!song?.id) return;
@@ -47,11 +94,12 @@ export function SongEditor() {
 
   if (!song) return <div className="p-4 text-slate-400">Cargando…</div>;
 
-  const chords = parseProgression(song.chords);
+  const chords = items.map((i) => i.chord);
   const root = (song.key || 'C') as Root;
   const mode: Mode = song.mode ?? 'major';
 
   return (
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
     <div className="p-4 max-w-2xl mx-auto space-y-5">
       <header className="flex items-center justify-between">
         <button onClick={() => navigate('/')} className="text-indigo-400 hover:underline">
@@ -80,49 +128,33 @@ export function SongEditor() {
       <div>
         <div className="flex items-center justify-between mb-1">
           <label className="text-sm text-slate-400">Progresión</label>
-          <div className="flex gap-2">
+          <button
+            onClick={() => saveItems([])}
+            className="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700"
+          >
+            Limpiar
+          </button>
+        </div>
+        <Progression items={items} onRemove={removeItem} />
+        {chords.length > 0 && (
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
             <button
-              onClick={removeLastChord}
-              className="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700"
+              onClick={() => playProgression(chords, song.bpm ?? 80)}
+              className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm"
             >
-              ← Quitar último
+              ▶ Reproducir progresión
             </button>
-            <button
-              onClick={() => update('chords', '')}
-              className="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700"
-            >
-              Limpiar
-            </button>
+            <label className="text-sm text-slate-400 flex items-center gap-1">
+              BPM
+              <input
+                type="number"
+                value={song.bpm ?? 80}
+                onChange={(e) => update('bpm', Number(e.target.value) || undefined)}
+                className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-800"
+              />
+            </label>
           </div>
-        </div>
-        <input
-          value={song.chords}
-          onChange={(e) => update('chords', e.target.value)}
-          placeholder="Am | F | C | G"
-          className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-800 font-mono"
-        />
-        <div className="mt-3 space-y-2">
-          <ChordPlayer chords={chords} />
-          {chords.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={() => playProgression(chords, song.bpm ?? 80)}
-                className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm"
-              >
-                ▶ Reproducir progresión
-              </button>
-              <label className="text-sm text-slate-400 flex items-center gap-1">
-                BPM
-                <input
-                  type="number"
-                  value={song.bpm ?? 80}
-                  onChange={(e) => update('bpm', Number(e.target.value) || undefined)}
-                  className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-800"
-                />
-              </label>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       <div>
@@ -136,5 +168,6 @@ export function SongEditor() {
         />
       </div>
     </div>
+    </DndContext>
   );
 }

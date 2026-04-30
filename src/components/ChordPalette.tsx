@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import {
   ALL_ROOTS,
   type Mode,
@@ -6,6 +8,7 @@ import {
   diatonicChords,
   chromaticPalette,
   familyColor,
+  type DiatonicChord,
 } from '../lib/keys';
 import { playChord } from '../lib/audio';
 
@@ -22,12 +25,6 @@ export function ChordPalette({ songKey, mode, onKeyChange, onModeChange, onAddCh
   const root = (ALL_ROOTS.includes(songKey as Root) ? songKey : 'C') as Root;
   const diatonic = diatonicChords(root, mode);
   const all = chromaticPalette(root, mode);
-
-  const handlePlay = (name: string) => playChord(name);
-  const handleAdd = (name: string) => {
-    onAddChord(name);
-    playChord(name);
-  };
 
   return (
     <div className="space-y-3">
@@ -59,23 +56,12 @@ export function ChordPalette({ songKey, mode, onKeyChange, onModeChange, onAddCh
       </div>
 
       <p className="text-xs text-slate-400">
-        Toca un acorde para oírlo y añadirlo a la progresión. Verde = tónica, azul = subdominante, rojo = dominante.
+        Toca para añadir y oír · arrastra a la progresión · verde = tónica · azul = subdominante · rojo = dominante.
       </p>
 
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
         {diatonic.map((c) => (
-          <button
-            key={c.roman}
-            onClick={() => handleAdd(c.name)}
-            onContextMenu={(e) => { e.preventDefault(); handlePlay(c.name); }}
-            className={`p-2 rounded-lg border text-left text-white transition ${familyColor(c.family)}`}
-          >
-            <div className="flex items-baseline justify-between">
-              <span className="text-lg font-bold">{c.name}</span>
-              <span className="text-xs opacity-80">{c.roman}</span>
-            </div>
-            <div className="text-[10px] leading-tight opacity-90 mt-0.5">{c.fn}</div>
-          </button>
+          <DiatonicCard key={c.roman} chord={c} onAdd={onAddChord} />
         ))}
       </div>
 
@@ -84,17 +70,61 @@ export function ChordPalette({ songKey, mode, onKeyChange, onModeChange, onAddCh
           <div className="text-xs text-slate-400 mb-1">Acordes fuera de la tonalidad</div>
           <div className="flex flex-wrap gap-1.5">
             {all.filter((c) => !c.diatonic).map((c) => (
-              <button
-                key={c.name}
-                onClick={() => handleAdd(c.name)}
-                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm"
-              >
-                {c.name}
-              </button>
+              <ChromaticChip key={c.name} name={c.name} onAdd={onAddChord} />
             ))}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function DiatonicCard({ chord, onAdd }: { chord: DiatonicChord; onAdd: (n: string) => void }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `palette-${chord.name}-${chord.roman}`,
+    data: { chord: chord.name },
+  });
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.5 : 1,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={() => { onAdd(chord.name); playChord(chord.name); }}
+      className={`p-2 rounded-lg border text-left text-white transition cursor-grab active:cursor-grabbing touch-none select-none ${familyColor(chord.family)}`}
+    >
+      <div className="flex items-baseline justify-between">
+        <span className="text-lg font-bold">{chord.name}</span>
+        <span className="text-xs opacity-80">{chord.roman}</span>
+      </div>
+      <div className="text-[10px] leading-tight opacity-90 mt-0.5">{chord.fn}</div>
+    </div>
+  );
+}
+
+function ChromaticChip({ name, onAdd }: { name: string; onAdd: (n: string) => void }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `palette-chrom-${name}`,
+    data: { chord: name },
+  });
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.5 : 1,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={() => { onAdd(name); playChord(name); }}
+      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm cursor-grab active:cursor-grabbing touch-none select-none"
+    >
+      {name}
     </div>
   );
 }
