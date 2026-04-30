@@ -12,10 +12,13 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { db } from '../db/database';
 import type { Song } from '../types';
 import { parseProgression } from '../lib/chords';
-import { playProgression } from '../lib/audio';
+import { emptyPattern, playProgression } from '../lib/audio';
 import { ChordPalette } from '../components/ChordPalette';
 import { Progression } from '../components/Progression';
+import { InstrumentPicker } from '../components/InstrumentPicker';
+import { DrumGrid } from '../components/DrumGrid';
 import type { Mode, Root } from '../lib/keys';
+import type { DrumPattern, InstrumentId } from '../types';
 
 export function SongEditor() {
   const { id } = useParams();
@@ -97,6 +100,9 @@ export function SongEditor() {
   const chords = items.map((i) => i.chord);
   const root = (song.key || 'C') as Root;
   const mode: Mode = song.mode ?? 'major';
+  const instrument: InstrumentId = song.instrument ?? 'synth';
+  const drums: DrumPattern = song.drums ?? emptyPattern();
+  const bpm = song.bpm ?? 90;
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
@@ -117,9 +123,16 @@ export function SongEditor() {
         className="w-full text-2xl font-bold bg-transparent border-b border-slate-700 focus:outline-none focus:border-indigo-500 py-2"
       />
 
+      <InstrumentPicker
+        value={instrument}
+        onChange={(id) => update('instrument', id)}
+        previewChord={root + (mode === 'minor' ? 'm' : '')}
+      />
+
       <ChordPalette
         songKey={root}
         mode={mode}
+        instrument={instrument}
         onKeyChange={(k) => update('key', k)}
         onModeChange={(m) => update('mode', m)}
         onAddChord={appendChord}
@@ -135,11 +148,11 @@ export function SongEditor() {
             Limpiar
           </button>
         </div>
-        <Progression items={items} onRemove={removeItem} />
+        <Progression items={items} instrument={instrument} onRemove={removeItem} />
         {chords.length > 0 && (
           <div className="mt-3 flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => playProgression(chords, song.bpm ?? 80)}
+              onClick={() => playProgression(chords, bpm, instrument)}
               className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm"
             >
               ▶ Reproducir progresión
@@ -148,7 +161,7 @@ export function SongEditor() {
               BPM
               <input
                 type="number"
-                value={song.bpm ?? 80}
+                value={bpm}
                 onChange={(e) => update('bpm', Number(e.target.value) || undefined)}
                 className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-800"
               />
@@ -156,6 +169,12 @@ export function SongEditor() {
           </div>
         )}
       </div>
+
+      <DrumGrid
+        pattern={drums}
+        bpm={bpm}
+        onChange={(p) => update('drums', p)}
+      />
 
       <div>
         <label className="text-sm text-slate-400">Letra / notas</label>

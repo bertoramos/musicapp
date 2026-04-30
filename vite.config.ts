@@ -1,7 +1,7 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
-
 export default defineConfig({
   // Si despliegas en GitHub Pages bajo https://USER.github.io/musicapp/, deja base así.
   // Si usas dominio propio o Netlify/Vercel, cambia a '/'.
@@ -31,4 +31,13 @@ export default defineConfig({
       },
     }),
   ],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+    },
+  },
 });

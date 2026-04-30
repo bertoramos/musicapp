@@ -6,6 +6,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { playChord } from '../lib/audio';
+import type { InstrumentId } from '../types';
 
 interface ProgressionItem {
   id: string;       // identificador único para dnd-kit
@@ -14,10 +15,11 @@ interface ProgressionItem {
 
 interface Props {
   items: ProgressionItem[];
+  instrument: InstrumentId;
   onRemove: (id: string) => void;
 }
 
-export function Progression({ items, onRemove }: Props) {
+export function Progression({ items, instrument, onRemove }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: 'progression-drop' });
 
   return (
@@ -34,7 +36,7 @@ export function Progression({ items, onRemove }: Props) {
           </p>
         )}
         {items.map((item) => (
-          <ChordBubble key={item.id} item={item} onRemove={onRemove} />
+          <ChordBubble key={item.id} item={item} instrument={instrument} onRemove={onRemove} />
         ))}
       </div>
     </SortableContext>
@@ -43,9 +45,11 @@ export function Progression({ items, onRemove }: Props) {
 
 function ChordBubble({
   item,
+  instrument,
   onRemove,
 }: {
   item: ProgressionItem;
+  instrument: InstrumentId;
   onRemove: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -67,7 +71,7 @@ function ChordBubble({
       <button
         {...attributes}
         {...listeners}
-        onClick={() => playChord(item.chord)}
+        onClick={() => playChord(item.chord, instrument)}
         className="font-bold cursor-grab active:cursor-grabbing select-none"
         title="Arrastra para reordenar · click para oír"
       >

@@ -12,15 +12,18 @@ import {
 } from '../lib/keys';
 import { playChord } from '../lib/audio';
 
+import type { InstrumentId } from '../types';
+
 interface Props {
   songKey: string;       // "C", "A"...
   mode: Mode;
+  instrument: InstrumentId;
   onKeyChange: (k: Root) => void;
   onModeChange: (m: Mode) => void;
   onAddChord: (chord: string) => void;
 }
 
-export function ChordPalette({ songKey, mode, onKeyChange, onModeChange, onAddChord }: Props) {
+export function ChordPalette({ songKey, mode, instrument, onKeyChange, onModeChange, onAddChord }: Props) {
   const [showAll, setShowAll] = useState(false);
   const root = (ALL_ROOTS.includes(songKey as Root) ? songKey : 'C') as Root;
   const diatonic = diatonicChords(root, mode);
@@ -61,7 +64,7 @@ export function ChordPalette({ songKey, mode, onKeyChange, onModeChange, onAddCh
 
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
         {diatonic.map((c) => (
-          <DiatonicCard key={c.roman} chord={c} onAdd={onAddChord} />
+          <DiatonicCard key={c.roman} chord={c} instrument={instrument} onAdd={onAddChord} />
         ))}
       </div>
 
@@ -70,7 +73,7 @@ export function ChordPalette({ songKey, mode, onKeyChange, onModeChange, onAddCh
           <div className="text-xs text-slate-400 mb-1">Acordes fuera de la tonalidad</div>
           <div className="flex flex-wrap gap-1.5">
             {all.filter((c) => !c.diatonic).map((c) => (
-              <ChromaticChip key={c.name} name={c.name} onAdd={onAddChord} />
+              <ChromaticChip key={c.name} name={c.name} instrument={instrument} onAdd={onAddChord} />
             ))}
           </div>
         </div>
@@ -79,7 +82,7 @@ export function ChordPalette({ songKey, mode, onKeyChange, onModeChange, onAddCh
   );
 }
 
-function DiatonicCard({ chord, onAdd }: { chord: DiatonicChord; onAdd: (n: string) => void }) {
+function DiatonicCard({ chord, instrument, onAdd }: { chord: DiatonicChord; instrument: InstrumentId; onAdd: (n: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `palette-${chord.name}-${chord.roman}`,
     data: { chord: chord.name },
@@ -94,7 +97,7 @@ function DiatonicCard({ chord, onAdd }: { chord: DiatonicChord; onAdd: (n: strin
       style={style}
       {...attributes}
       {...listeners}
-      onClick={() => { onAdd(chord.name); playChord(chord.name); }}
+      onClick={() => { onAdd(chord.name); playChord(chord.name, instrument); }}
       className={`p-2 rounded-lg border text-left text-white transition cursor-grab active:cursor-grabbing touch-none select-none ${familyColor(chord.family)}`}
     >
       <div className="flex items-baseline justify-between">
@@ -106,7 +109,7 @@ function DiatonicCard({ chord, onAdd }: { chord: DiatonicChord; onAdd: (n: strin
   );
 }
 
-function ChromaticChip({ name, onAdd }: { name: string; onAdd: (n: string) => void }) {
+function ChromaticChip({ name, instrument, onAdd }: { name: string; instrument: InstrumentId; onAdd: (n: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `palette-chrom-${name}`,
     data: { chord: name },
@@ -121,7 +124,7 @@ function ChromaticChip({ name, onAdd }: { name: string; onAdd: (n: string) => vo
       style={style}
       {...attributes}
       {...listeners}
-      onClick={() => { onAdd(name); playChord(name); }}
+      onClick={() => { onAdd(name); playChord(name, instrument); }}
       className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm cursor-grab active:cursor-grabbing touch-none select-none"
     >
       {name}
