@@ -5,6 +5,8 @@ import type { Song } from '../types';
 import { parseProgression } from '../lib/chords';
 import { playProgression } from '../lib/audio';
 import { ChordPlayer } from '../components/ChordPlayer';
+import { ChordPalette } from '../components/ChordPalette';
+import type { Mode, Root } from '../lib/keys';
 
 export function SongEditor() {
   const { id } = useParams();
@@ -23,6 +25,19 @@ export function SongEditor() {
     db.songs.put(updated);
   }
 
+  function appendChord(chord: string) {
+    if (!song) return;
+    const sep = song.chords.trim().length === 0 ? '' : ' | ';
+    update('chords', song.chords + sep + chord);
+  }
+
+  function removeLastChord() {
+    if (!song) return;
+    const list = parseProgression(song.chords);
+    list.pop();
+    update('chords', list.join(' | '));
+  }
+
   async function remove() {
     if (!song?.id) return;
     if (!confirm('¿Borrar esta canción?')) return;
@@ -33,9 +48,11 @@ export function SongEditor() {
   if (!song) return <div className="p-4 text-slate-400">Cargando…</div>;
 
   const chords = parseProgression(song.chords);
+  const root = (song.key || 'C') as Root;
+  const mode: Mode = song.mode ?? 'major';
 
   return (
-    <div className="p-4 max-w-2xl mx-auto space-y-4">
+    <div className="p-4 max-w-2xl mx-auto space-y-5">
       <header className="flex items-center justify-between">
         <button onClick={() => navigate('/')} className="text-indigo-400 hover:underline">
           ← Volver
@@ -52,45 +69,58 @@ export function SongEditor() {
         className="w-full text-2xl font-bold bg-transparent border-b border-slate-700 focus:outline-none focus:border-indigo-500 py-2"
       />
 
-      <div className="grid grid-cols-2 gap-3">
-        <label className="text-sm">
-          <span className="text-slate-400">Tonalidad</span>
-          <input
-            value={song.key ?? ''}
-            onChange={(e) => update('key', e.target.value)}
-            placeholder="Ej: Am"
-            className="w-full mt-1 px-3 py-2 rounded bg-slate-900 border border-slate-800"
-          />
-        </label>
-        <label className="text-sm">
-          <span className="text-slate-400">BPM</span>
-          <input
-            type="number"
-            value={song.bpm ?? ''}
-            onChange={(e) => update('bpm', Number(e.target.value) || undefined)}
-            placeholder="80"
-            className="w-full mt-1 px-3 py-2 rounded bg-slate-900 border border-slate-800"
-          />
-        </label>
-      </div>
+      <ChordPalette
+        songKey={root}
+        mode={mode}
+        onKeyChange={(k) => update('key', k)}
+        onModeChange={(m) => update('mode', m)}
+        onAddChord={appendChord}
+      />
 
       <div>
-        <label className="text-sm text-slate-400">Acordes / progresión</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-sm text-slate-400">Progresión</label>
+          <div className="flex gap-2">
+            <button
+              onClick={removeLastChord}
+              className="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700"
+            >
+              ← Quitar último
+            </button>
+            <button
+              onClick={() => update('chords', '')}
+              className="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700"
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
         <input
           value={song.chords}
           onChange={(e) => update('chords', e.target.value)}
           placeholder="Am | F | C | G"
-          className="w-full mt-1 px-3 py-2 rounded bg-slate-900 border border-slate-800 font-mono"
+          className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-800 font-mono"
         />
         <div className="mt-3 space-y-2">
           <ChordPlayer chords={chords} />
           {chords.length > 0 && (
-            <button
-              onClick={() => playProgression(chords, song.bpm ?? 80)}
-              className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm"
-            >
-              ▶ Reproducir progresión
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => playProgression(chords, song.bpm ?? 80)}
+                className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm"
+              >
+                ▶ Reproducir progresión
+              </button>
+              <label className="text-sm text-slate-400 flex items-center gap-1">
+                BPM
+                <input
+                  type="number"
+                  value={song.bpm ?? 80}
+                  onChange={(e) => update('bpm', Number(e.target.value) || undefined)}
+                  className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-800"
+                />
+              </label>
+            </div>
           )}
         </div>
       </div>
